@@ -1,96 +1,115 @@
 ﻿"use client";
 
-import React, { useState } from 'react';
-import { Search } from 'lucide-react';
-import { calculateResonance } from '@/lib/resonance-engine';
+import React, { useState, useEffect } from 'react';
+// 確保這裡的引用與安裝的名稱一致
+import { Search, Activity, Zap } from 'lucide-react';
 
-export default function Home() {
-  const [ticker, setTicker] = useState('');
-  const [report, setReport] = useState<any>(null);
+const TypewriterText = ({ text }: { text: string }) => {
+  const [displayedText, setDisplayedText] = useState("");
+  useEffect(() => {
+    setDisplayedText("");
+    if (!text) return;
+    let i = 0;
+    const timer = setInterval(() => {
+      setDisplayedText((prev) => prev + text.charAt(i));
+      i++;
+      if (i >= text.length) clearInterval(timer);
+    }, 30);
+    return () => clearInterval(timer);
+  }, [text]);
+  return <p className="leading-relaxed text-blue-100/90">{displayedText}<span className="animate-pulse">|</span></p>;
+};
+
+const GaugeChart = ({ score }: { score: number }) => {
+  const rotation = (score / 100) * 180 - 90;
+  return (
+    <div className="relative flex flex-col items-center justify-center p-6 bg-slate-900/50 rounded-2xl border border-blue-500/20">
+      <div className="relative w-48 h-24 overflow-hidden">
+        <div className="absolute top-0 w-48 h-48 border-[12px] border-slate-800 rounded-full"></div>
+        <div 
+          className="absolute top-0 w-48 h-48 border-[12px] border-t-blue-500 border-r-blue-500 border-b-transparent border-l-transparent rounded-full transition-all duration-1000"
+          style={{ transform: `rotate(${rotation}deg)` }}
+        ></div>
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-3xl font-black text-white italic">
+          {score || 0}
+        </div>
+      </div>
+      <span className="mt-2 text-[10px] font-bold tracking-widest text-blue-400 uppercase">Resonance Score</span>
+    </div>
+  );
+};
+
+export default function AlphaVision() {
+  const [symbol, setSymbol] = useState('');
   const [loading, setLoading] = useState(false);
+  // 設定初始狀態避開 undefined 錯誤
+  const [data, setData] = useState<{score:number; analysis:string; technical:string; sentiment:string} | null>(null);
 
-  const handleSearch = async () => {
-    if (!ticker) return;
+  const handleAnalyze = async () => {
+    if (!symbol) return;
     setLoading(true);
     try {
-      const result = await calculateResonance(ticker);
-      setReport(result);
+      const res = await fetch('/api/predict/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol })
+      });
+      const result = await res.json();
+      setData(result);
     } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
+      console.error("Analysis failed", error);
     }
+    setLoading(false);
   };
 
   return (
-    <main className="min-h-screen bg-black text-white pb-10 px-4">
-      {/* 🚀 杰哥，這就是解決 App 模式遮擋的「護城河」 */}
-      <div className="h-14 md:h-20 w-full"></div>
-
-      <div className="max-w-md mx-auto flex flex-col items-center">
-        
-        {/* 標題區域 - 加上額外的 mt-4 確保絕對不會被遮到 */}
-        <div className="text-center mb-8 mt-4">
-          <h1 className="text-3xl md:text-5xl font-black tracking-tighter italic text-white mb-2">
-            ALPHA VISION
-          </h1>
-          <div className="h-1 w-20 bg-green-500 mx-auto"></div>
+    <div className="min-h-screen bg-[#050a15] text-slate-200">
+      <main className="max-w-lg mx-auto px-6 pt-12 pb-24">
+        <div className="flex items-center gap-3 mb-10">
+          <Zap className="text-blue-500" size={24} />
+          <h1 className="text-2xl font-black italic tracking-tighter text-white">ALPHA VISION</h1>
         </div>
 
-        {/* 搜尋框 */}
-        <div className="w-full relative mb-8">
-          <input
-            type="text"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value)}
-            placeholder="輸入股票代碼..."
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-4 px-6 focus:outline-none focus:border-green-500 transition-all text-lg"
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+        <div className="relative mb-8">
+          <input 
+            type="text" 
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value)}
+            placeholder="輸入股票代號"
+            className="w-full bg-slate-900 border-2 border-slate-800 rounded-2xl py-4 px-6 focus:outline-none focus:border-blue-500 text-lg"
           />
           <button 
-            onClick={handleSearch}
-            className="absolute right-3 top-3 p-2 bg-green-500 rounded-xl hover:bg-green-400 transition-colors"
+            onClick={handleAnalyze}
+            disabled={loading}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white font-bold py-2 px-6 rounded-xl"
           >
-            <Search size={24} className="text-black" />
+            {loading ? "..." : "診斷"}
           </button>
         </div>
 
-        {/* 結果區域 */}
-        {loading && (
-          <div className="text-green-500 animate-pulse font-mono mt-10">
-            CONNECTING TO RESONANCE ENGINE...
-          </div>
-        )}
-
-        {report && !loading && (
-          <div className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 text-center">
-              <div className="text-zinc-500 text-sm font-mono mb-2">RESONANCE SCORE</div>
-              <div className="text-7xl md:text-8xl font-black text-green-500 tracking-tighter">
-                {report.finalScore}
+        {data && (
+          <div className="space-y-6">
+            <GaugeChart score={data.score} />
+            <div className="bg-slate-900 border border-blue-500/10 rounded-3xl p-6">
+              <div className="flex items-center gap-2 mb-4 text-blue-400">
+                <Activity size={18} />
+                <span className="text-xs font-bold uppercase">AI Diagnostic</span>
               </div>
-              
-              <div className="mt-6 pt-6 border-t border-zinc-800">
-                <div className="text-xs text-zinc-500 font-mono mb-3 text-left">AI DIAGNOSTIC</div>
-                <p className="text-left text-base md:text-lg leading-relaxed text-zinc-200 italic">
-                  「{report.dimensions.chip.reason}」
-                </p>
-              </div>
+              <TypewriterText text={data.analysis} />
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 text-center">
-                <div className="text-zinc-500 text-xs mb-1">CHIP</div>
-                <div className="text-xl font-bold text-green-400">STRONG</div>
-              </div>
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 text-center">
-                <div className="text-zinc-500 text-xs mb-1">TECH</div>
-                <div className="text-xl font-bold text-zinc-400">STABLE</div>
-              </div>
+            <div className="grid grid-cols-2 gap-4 text-center">
+               <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+                  <div className="text-slate-500 text-[10px] uppercase font-bold mb-1">Technical</div>
+                  <div className="text-white font-black italic">{data.technical}</div>
+               </div>
+               <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+                  <div className="text-slate-500 text-[10px] uppercase font-bold mb-1">Sentiment</div>
+                  <div className="text-white font-black italic">{data.sentiment}</div>
+               </div>
             </div>
           </div>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
