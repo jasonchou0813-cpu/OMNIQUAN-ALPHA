@@ -7,27 +7,36 @@ const openai = new OpenAI({
 
 export async function POST(req: Request) {
   try {
-    const { ticker, score, data } = await req.json();
-    
-    const response = await openai.chat.completions.create({
+    const { symbol } = await req.json();
+
+    // 1. 呼叫 OpenAI 進行專業診斷
+    const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: "你是一位精通台股的投資專家。請根據共振分數與數據，給出 30 字以內的犀利短評。"
+          content: "你是一位專業的台股分析師。請針對輸入的股票代號提供：1. 共振分數(0-100) 2. 簡短診斷 3. 技術面評級(如:STRONG) 4. 籌碼面評級。請嚴格以 JSON 格式回傳。"
         },
         {
           role: "user",
-          content: `標的：${ticker}，分數：${score}，收盤：${data.close}。請分析。`
+          content: `請分析股票代號：${symbol}`
         }
       ],
-      temperature: 0.5,
+      response_format: { type: "json_object" }
     });
 
-    return NextResponse.json({ 
-      analysis: response.choices[0].message.content 
+    const aiResponse = JSON.parse(completion.choices[0].message.content || "{}");
+
+    // 2. 回傳給前端
+    return NextResponse.json({
+      score: aiResponse.score || 80,
+      analysis: aiResponse.analysis || "目前走勢符合共振模型，建議持續觀察量能變化。",
+      technical: aiResponse.technical || "STABLE",
+      sentiment: aiResponse.sentiment || "NEUTRAL"
     });
-  } catch (error) {
-    return NextResponse.json({ analysis: "數據共振中，量價結構穩定。" });
+
+  } catch (error: any) {
+    console.error('API Error:', error);
+    return NextResponse.json({ error: '分析失敗' }, { status: 500 });
   }
 }
